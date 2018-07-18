@@ -2,14 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -32,14 +29,14 @@ namespace VSChangeTargetFrameworkExtension
 
       frameworkMultiTargeting.GetSupportedFrameworks(out Array prgSupportedFrameworks);
 
-      frameworkModels = prgSupportedFrameworks.Cast<string>()
-                                              .Select(GetFrameworkModel)
+      this.frameworkModels = prgSupportedFrameworks.Cast<string>()
+                                              .Select(this.GetFrameworkModel)
                                               .ToList();
     }
 
     private FrameworkModel GetFrameworkModel(string moniker)
     {
-      frameworkMultiTargeting.GetDisplayNameForTargetFx(moniker, out string displayName);
+      this.frameworkMultiTargeting.GetDisplayNameForTargetFx(moniker, out string displayName);
       return new FrameworkModel { DisplayName = displayName, Moniker = moniker };
     }
 
@@ -48,53 +45,53 @@ namespace VSChangeTargetFrameworkExtension
 
     public void Show()
     {
-      lock (syncRoot)
+      lock (this.syncRoot)
       {
-        synchronizationContext = SynchronizationContext.Current;
+        this.synchronizationContext = SynchronizationContext.Current;
 
-        projectsUpdateList = new ProjectsUpdateList();
+        this.projectsUpdateList = new ProjectsUpdateList();
 
-        projectsUpdateList.UpdateFired += Update;
-        projectsUpdateList.ReloadFired += ReloadProjects;
+        this.projectsUpdateList.UpdateFired += this.Update;
+        this.projectsUpdateList.ReloadFired += this.ReloadProjects;
 
-        projectsUpdateList.Frameworks = frameworkModels;
+        this.projectsUpdateList.Frameworks = this.frameworkModels;
 
-        projectsUpdateList.State = "Waiting all projects are loaded...";
+        this.projectsUpdateList.State = "Waiting all projects are loaded...";
 
-        if (applicationObject.Solution == null)
+        if (this.applicationObject.Solution == null)
         {
-          projectsUpdateList.State = "No solution";
+          this.projectsUpdateList.State = "No solution";
         }
         else
         {
-          if (isSolutionLoaded)
+          if (this.isSolutionLoaded)
             ReloadProjects();
         }
 
-        projectsUpdateList.StartPosition = FormStartPosition.CenterScreen;
-        projectsUpdateList.TopMost = true;
-        projectsUpdateList.ShowDialog();
+        this.projectsUpdateList.StartPosition = FormStartPosition.CenterScreen;
+        this.projectsUpdateList.TopMost = true;
+        this.projectsUpdateList.ShowDialog();
       }
     }
 
     public void OnBeforeSolutionLoaded()
     {
-      lock (syncRoot)
+      lock (this.syncRoot)
       {
-        if (projectsUpdateList != null)
-          projectsUpdateList.State = "Waiting all projects are loaded...";
+        if (this.projectsUpdateList != null)
+          this.projectsUpdateList.State = "Waiting all projects are loaded...";
 
-        isSolutionLoaded = false;
+        this.isSolutionLoaded = false;
       }
     }
 
     public void OnAfterSolutionLoaded()
     {
-      lock (syncRoot)
+      lock (this.syncRoot)
       {
-        isSolutionLoaded = true;
+        this.isSolutionLoaded = true;
 
-        if (projectsUpdateList?.Visible == true)
+        if (this.projectsUpdateList?.Visible == true)
           ReloadProjects();
       }
     }
@@ -103,14 +100,14 @@ namespace VSChangeTargetFrameworkExtension
     {
       var projectModels = LoadProjects();
 
-      projectsUpdateList.State = projectModels.Count == 0 ? "No .Net projects" : String.Empty;
+      this.projectsUpdateList.State = projectModels.Count == 0 ? "No .Net projects" : string.Empty;
 
-      projectsUpdateList.Projects = projectModels;
+      this.projectsUpdateList.Projects = projectModels;
     }
 
     private List<ProjectModel> LoadProjects()
     {
-      Projects projects = applicationObject.Solution.Projects;
+      Projects projects = this.applicationObject.Solution.Projects;
 
       if (projects.Count == 0)
       {
@@ -182,22 +179,22 @@ namespace VSChangeTargetFrameworkExtension
 
     async void Update()
     {
-      FrameworkModel frameworkModel = projectsUpdateList.SelectedFramework;
+      FrameworkModel frameworkModel = this.projectsUpdateList.SelectedFramework;
 
-      projectsUpdateList.State = "Updating...";
+      this.projectsUpdateList.State = "Updating...";
 
       await UpdateFrameworks(frameworkModel);
 
-      projectsUpdateList.Projects = LoadProjects();
+      this.projectsUpdateList.Projects = LoadProjects();
 
-      projectsUpdateList.State = "Done";
+      this.projectsUpdateList.State = "Done";
     }
 
     private Task UpdateFrameworks(FrameworkModel frameworkModel)
     {
       return Task.Run(() =>
           {
-            var enumerable = projectsUpdateList.Projects.Where(p => p.IsSelected);
+            var enumerable = this.projectsUpdateList.Projects.Where(p => p.IsSelected);
 
             foreach (var projectModel in enumerable)
             {
@@ -205,10 +202,10 @@ namespace VSChangeTargetFrameworkExtension
               {
                 projectModel.DteProject.Properties.Item("TargetFrameworkMoniker").Value = frameworkModel.Moniker;
 
-                synchronizationContext.Post(o =>
+                this.synchronizationContext.Post(o =>
                           {
                             var pm = (ProjectModel)o;
-                            projectsUpdateList.State = string.Format("Updating... {0} done", pm.Name);
+                            this.projectsUpdateList.State = string.Format("Updating... {0} done", pm.Name);
                           }, projectModel);
               }
               catch (COMException e) //possible "project unavailable" for unknown reasons
